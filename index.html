@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ticket</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f4f4f4;
+        }
+
+        .loading {
+            font-size: 20px;
+            color: #333;
+            text-align: center;
+        }
+
+        .ticket {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            border: 1px solid #ddd;
+            margin-top: 20px;
+            background-color: #fff;
+            max-width: 500px;
+            width: 100%;
+            position: relative; /* Para que el botón se posicione con respecto a este contenedor */
+            min-height: 400px; /* Asegúrate de que el contenedor sea lo suficientemente alto para mostrar el botón en la parte inferior */
+        }
+
+        .ticket-header {
+            font-size: 50px;
+            text-align: center;
+            font-weight: bold;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        .ticket-body p {
+            font-size: 16px;
+            margin: 5px 0;
+            text-align: center;
+        }
+
+        .left-align {
+            text-align: left;
+        }
+
+        .ticket-full {
+            font-size: 20px;
+            font-weight: bold;
+            text-align: center;
+        }
+
+        .bold-text {
+            font-weight: bold;
+        }
+
+        .ticket-amount {
+            font-size: 1.2em;
+            color: #2e8b57;
+            font-weight: bold;
+        }
+
+        .download-btn {
+            position: absolute; /* Posiciona el botón de forma absoluta dentro del contenedor */
+            bottom: 20px; /* Pone el botón en la parte inferior */
+            right: 20px; /* Pone el botón a la derecha */
+            padding: 10px 20px;
+            background-color: #2e8b57;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+            border: none;
+        }
+
+        .download-btn:hover {
+            background-color: #3cb371;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="loading" class="loading">Cargando...</div>
+
+    <div id="ticket" class="ticket" style="display:none;">
+        <h1 id="ticket-header" class="ticket-header"></h1>
+        <div id="ticket-body" class="ticket-body"></div>
+        <button id="download-btn" class="download-btn">Descargar </button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+    <script>
+        // URL de la API
+        const apiUrl = "https://api.paymind.mx/transactions-management/tickets/search-by-original-number/";
+
+        // Obtener el número original de la URL (ejemplo: ?originalNumber=123456)
+        const urlParams = new URLSearchParams(window.location.search);
+        const originalNumber = 21250324155237; // pruebas
+
+        if (originalNumber) {
+            // Mostrar carga
+            document.getElementById('loading').style.display = 'block';
+
+            // Hacer la solicitud a la API
+            fetch(apiUrl + originalNumber)
+                .then(response => response.json())
+                .then(data => {
+                    // Ocultar la carga
+                    document.getElementById('loading').style.display = 'none';
+                    document.getElementById('ticket').style.display = 'block';
+
+                    // Rellenar los datos del ticket
+                    const ticketResponse = data.data;
+
+                    // Asignar valores a los elementos HTML
+                    document.getElementById('ticket-header').textContent = ticketResponse.subMerchantName;
+
+                    let ticketBody = `
+                        <hr style="border: 1px solid #ddd; margin: 10px 0;">
+                        <p class="ticket-full">
+                            ${ticketResponse.city.toUpperCase()}, 
+                            ${ticketResponse.state.toUpperCase()}, 
+                            ${ticketResponse.street.toUpperCase()}, 
+                            ${ticketResponse.neighborhoods.toUpperCase()}
+                        </p>
+                        <hr style="border: 1px solid #ddd; margin: 10px 0;">
+                        <p class="ticket-authCode"><span class="bold-text">Aut:</span> ${ticketResponse.authCode}</p>
+                        <p class="ticket-operation">
+                              ${ticketResponse.msi.toLowerCase() === 'contado' ?
+                            `<span class="bold-text">Operacion:</span> CONTADO` :
+                            `<span class="bold-text">Msi:</span> ${ticketResponse.msi} msi`}
+                        </p>
+                        <p class="ticket-authCode"><span class="bold-text">Ref:</span> ${ticketResponse.originalNumber}</p>
+                        <p class="ticket-authCode"><span class="bold-text">status:</span> ${ticketResponse.responseMessage}</p>
+                        <p class="ticket-aid"><span class="bold-text">AID:</span> ${ticketResponse.aid}</p>
+                        <p class="ticket-arqc"><span class="bold-text">Arqc:</span> ${ticketResponse.arqc}</p>
+                        <p class="ticket-date"><span class="bold-text">Fecha:</span> ${new Date(ticketResponse.date).toLocaleDateString('es-MX')} 
+                            <span class="bold-text"> Hora:</span> ${new Date(ticketResponse.date).toLocaleTimeString('es-MX')}
+                        </p>
+                        <p class="ticket-arqc"><span class="bold-text">Tarjeta:</span> ${ticketResponse.cardMask}</p>
+                        <p class="ticket-arqc"><span class="bold-text">Banco:</span> ${ticketResponse.cardIssuerBank}</p>
+                        <p class="ticket-amount">TOTAL: <strong>${ticketResponse.amount.toFixed(2)}</strong></p>
+                    `;
+
+                    // Insertar el contenido del ticket
+                    document.getElementById('ticket-body').innerHTML = ticketBody;
+
+                    // Función para generar y descargar el PDF
+                    document.getElementById('download-btn').addEventListener('click', function () {
+                        const { jsPDF } = window.jspdf;
+                        const doc = new jsPDF();
+
+                        // Añadir contenido al PDF
+                        doc.text(ticketResponse.subMerchantName, 10, 10);
+                        doc.text(ticketResponse.city + ", " + ticketResponse.state, 10, 20);
+                        doc.text('Aut: ' + ticketResponse.authCode, 10, 30);
+                        doc.text('Msi: ' + (ticketResponse.msi.toLowerCase() === 'contado' ? 'CONTADO' : ticketResponse.msi + ' msi'), 10, 40);
+                        doc.text('Ref: ' + ticketResponse.originalNumber, 10, 50);
+                        doc.text('Status: ' + ticketResponse.responseMessage, 10, 60);
+                        doc.text('AID: ' + ticketResponse.aid, 10, 70);
+                        doc.text('Arqc: ' + ticketResponse.arqc, 10, 80);
+                        doc.text('Fecha: ' + new Date(ticketResponse.date).toLocaleDateString('es-MX') + ' Hora: ' + new Date(ticketResponse.date).toLocaleTimeString('es-MX'), 10, 90);
+                        doc.text('Tarjeta: ' + ticketResponse.cardMask, 10, 100);
+                        doc.text('Banco: ' + ticketResponse.cardIssuerBank, 10, 110);
+                        doc.text('TOTAL: ' + ticketResponse.amount.toFixed(2), 10, 120);
+
+                        // Descargar el PDF
+                        doc.save('ticket.pdf');
+                    });
+
+                })
+                .catch(error => {
+                    console.error('Error al obtener el ticket', error);
+                    document.getElementById('loading').textContent = 'Error al cargar el ticket';
+                });
+        } else {
+            document.getElementById('loading').textContent = 'No se recibió el número original.';
+        }
+    </script>
+
+</body>
+
+</html>
+    
